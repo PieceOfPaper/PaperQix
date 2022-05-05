@@ -299,10 +299,10 @@ public class QixGame
         m_DrawLineThread = null;
 
         OnDrawLine?.Invoke(drawLinePosList.ToArray());
-        drawLinePosList.Clear();
-
         OnFloodFill?.Invoke(changedPositions == null ? new Vector2Int[0] : changedPositions);
         onFinished?.Invoke();
+
+        drawLinePosList.Clear();
     }
 
     public QixBoardState GetBoardState(int x, int y)
