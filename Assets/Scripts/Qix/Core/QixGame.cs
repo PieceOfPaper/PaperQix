@@ -33,7 +33,7 @@ public class QixGame
     public Action<Vector2Int[]> OnFloodFill;
 
 
-
+    System.Threading.Thread m_DrawLineThread;
 
     public QixGame(Vector2Int boardSize)
     {
@@ -171,6 +171,138 @@ public class QixGame
 
         OnFloodFill?.Invoke(changedPositions);
         return changedPositions;
+    }
+
+    public IEnumerator DrawLineRoutine(Vector2Int[] positions, System.Action onFinished)
+    {
+        if (m_Board == null)
+        {
+            onFinished?.Invoke();
+            yield break;
+        }
+
+        if (positions == null || positions.Length < 2)
+        {
+            onFinished?.Invoke();
+            yield break;
+        }
+
+        if ((QixBoardState.Colored_Start + m_ColoredCount) >= QixBoardState.Colored_End)
+        {
+            onFinished?.Invoke();
+            yield break;
+        }
+
+        bool isCompleted = false;
+        Vector2Int[] changedPositions = null;
+        List<Vector2Int> drawLinePosList = new List<Vector2Int>();
+        m_DrawLineThread = new System.Threading.Thread(() =>
+        {
+            // 줄긋기
+            Vector2Int direction = Vector2Int.zero;
+            Vector2Int boardIndex = Vector2Int.one * -1;
+            for (int i = 1; i < positions.Length; i++)
+            {
+                if (positions[i - 1].x == positions[i].x)
+                {
+                    if (positions[i - 1].y < positions[i].y)
+                        direction = Vector2Int.up;
+                    else
+                        direction = Vector2Int.down;
+                }
+                else if (positions[i - 1].y == positions[i].y)
+                {
+                    if (positions[i - 1].x < positions[i].x)
+                        direction = Vector2Int.right;
+                    else
+                        direction = Vector2Int.left;
+                }
+                else
+                {
+                    // error....
+                    isCompleted = true;
+                    return;
+                }
+
+                boardIndex = positions[i - 1];
+                while (boardIndex != positions[i])
+                {
+                    if (boardIndex.y >= 0 && boardIndex.y < m_Board.Length &&
+                        m_Board[boardIndex.y] != null && boardIndex.x >= 0 && boardIndex.x < m_Board[boardIndex.y].Length)
+                    {
+                        drawLinePosList.Add(boardIndex);
+                        m_Board[boardIndex.y][boardIndex.x] = QixBoardState.Line;
+                    }
+                    boardIndex += direction;
+                }
+                drawLinePosList.Add(positions[i]);
+                m_Board[positions[i].y][positions[i].x] = QixBoardState.Line;
+            }
+
+
+            // 마지막줄을 기준으로 좌우 나눠보자.
+            Vector2Int[] qixPos = new Vector2Int[2];
+            if (direction == Vector2Int.up)
+            {
+                qixPos[0] = boardIndex + Vector2Int.down + Vector2Int.left;
+                qixPos[1] = boardIndex + Vector2Int.down + Vector2Int.right;
+            }
+            else if (direction == Vector2Int.down)
+            {
+                qixPos[0] = boardIndex + Vector2Int.up + Vector2Int.left;
+                qixPos[1] = boardIndex + Vector2Int.up + Vector2Int.right;
+            }
+            else if (direction == Vector2Int.left)
+            {
+                qixPos[0] = boardIndex + Vector2Int.right + Vector2Int.up;
+                qixPos[1] = boardIndex + Vector2Int.right + Vector2Int.down;
+            }
+            else if (direction == Vector2Int.right)
+            {
+                qixPos[0] = boardIndex + Vector2Int.left + Vector2Int.up;
+                qixPos[1] = boardIndex + Vector2Int.left + Vector2Int.down;
+            }
+
+
+            // 체워라!!!
+            changedPositions = QixFloodFill.AutoFill<QixBoardState>(
+                m_Board,
+                qixPos,
+                QixBoardState.Colored_Start + m_ColoredCount,
+                new QixBoardState[] { QixBoardState.TEMP_1, QixBoardState.TEMP_2 },
+                QixBoardState.Empty);
+            m_ColoredCount++;
+
+
+            // 가득 체웠는지 체크해보자.
+            m_IsAllColored = true;
+            for (int y = 0; y < m_Board.Length; y++)
+            {
+                for (int x = 0; x < m_Board[y].Length; x++)
+                {
+                    if (m_Board[y][x] == QixBoardState.Empty)
+                    {
+                        m_IsAllColored = false;
+                        break;
+                    }
+                }
+                if (m_IsAllColored == false)
+                    break;
+            }
+
+            isCompleted = true;
+        });
+
+        m_DrawLineThread.Start();
+        while (isCompleted == false) yield return null;
+        m_DrawLineThread.Abort();
+        m_DrawLineThread = null;
+
+        OnDrawLine?.Invoke(drawLinePosList.ToArray());
+        drawLinePosList.Clear();
+
+        OnFloodFill?.Invoke(changedPositions == null ? new Vector2Int[0] : changedPositions);
+        onFinished?.Invoke();
     }
 
     public QixBoardState GetBoardState(int x, int y)

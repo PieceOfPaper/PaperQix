@@ -95,13 +95,10 @@ public static class QixFloodFill
                 minCount = currentCount;
                 minIndex = i;
             }
-
-            GC.Collect();
         }
 
         var list = new List<Vector2Int>();
         Fill<T>(board, pos[minIndex], changeValue, targetValue, list);
-        GC.Collect();
         return list.ToArray();
     }
 }

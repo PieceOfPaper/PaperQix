@@ -24,7 +24,7 @@ public class UIQixPlayer : MonoBehaviour
     bool m_IsDrawing = false;
     Vector2Int m_DrawDirection;
     List<Vector2Int> m_DrawLinePoints = new List<Vector2Int>();
-
+    bool m_IsCalcurating = false;
 
     Vector2 m_BlockSize = Vector2.zero;
 
@@ -83,6 +83,7 @@ public class UIQixPlayer : MonoBehaviour
     bool Move(Vector2Int movement, bool pressDrawKey)
     {
         if (m_QixGame == null) return false;
+        //if (m_IsCalcurating == true) return false;
 
         Vector2Int movedPosition = m_CurrentPosition + movement;
 
@@ -198,7 +199,12 @@ public class UIQixPlayer : MonoBehaviour
                 Debug.Log("[UIQixPlayer] 라인그리기 끝");
                 m_IsDrawing = false;
                 m_DrawLinePoints.Add(new Vector2Int(Mathf.FloorToInt(movedPosition.x), Mathf.FloorToInt(movedPosition.y)));
-                m_QixGame.DrawLine(m_DrawLinePoints.ToArray());
+                //m_QixGame.DrawLine(m_DrawLinePoints.ToArray());
+                m_IsCalcurating = true;
+                StartCoroutine(m_QixGame.DrawLineRoutine(m_DrawLinePoints.ToArray(), () =>
+                {
+                    m_IsCalcurating = false;
+                }));
                 m_DrawLinePoints.Clear();
             }
             return true;
@@ -208,7 +214,8 @@ public class UIQixPlayer : MonoBehaviour
             // 라인을 그릴거?
             if (currentPosState == QixBoardState.Line && 
                 movedPosState == QixBoardState.Empty && 
-                pressDrawKey == true)
+                pressDrawKey == true &&
+                m_IsCalcurating == false)
             {
                 Debug.Log("[UIQixPlayer] 라인그리기 시작");
                 m_IsDrawing = true;
@@ -228,7 +235,7 @@ public class UIQixPlayer : MonoBehaviour
             }
         }
 
-        Debug.Log($"[UIQixPlayer] ??? - {m_CurrentPosition}({currentPosState}), {movedPosition}({movedPosState})");
+        //Debug.Log($"[UIQixPlayer] ??? - {m_CurrentPosition}({currentPosState}), {movedPosition}({movedPosState})");
         return false;
     }
 
